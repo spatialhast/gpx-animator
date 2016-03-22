@@ -15,6 +15,7 @@
 package sk.freemap.gpxAnimator;
 
 import java.awt.Color;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -49,13 +50,18 @@ public class Configuration {
 	private Color flashbackColor;
 	private Long flashbackDuration;
 	
-	private String output;
+	@XmlJavaTypeAdapter(FileXmlAdapter.class)
+	private File output;
 	private String attribution;
 	
 	private int fontSize;
 	private Double markerSize;
 	private Double waypointSize;
 
+	private Double minLon;
+	private Double maxLon;
+	private Double minLat;
+	private Double maxLat;
 
 	@XmlElementWrapper
 	@XmlElement(name = "trackConfiguration")
@@ -73,9 +79,11 @@ public class Configuration {
 			final Double speedup, final long tailDuration, final double fps, final Long totalTime,
 			final float backgroundMapVisibility, final String tmsUrlTemplate,
 			final boolean skipIdle, final Color flashbackColor, final Long flashbackDuration,
-			final String output, final String attribution,
+			final File output, final String attribution,
 			final int fontSize, final Double markerSize, final Double waypointSize,
+			final Double minLon, final Double maxLon, final Double minLat, final Double maxLat,
 			final List<TrackConfiguration> trackConfigurationList) {
+		
 		this.margin = margin;
 		this.width = width;
 		this.height = height;
@@ -95,6 +103,10 @@ public class Configuration {
 		this.markerSize = markerSize;
 		this.waypointSize = waypointSize;
 		this.trackConfigurationList = trackConfigurationList;
+		this.minLon = minLon;
+		this.maxLon = maxLon;
+		this.minLat = minLat;
+		this.maxLat = maxLat;
 	}
 
 
@@ -163,7 +175,7 @@ public class Configuration {
 	}
 	
 	
-	public String getOutput() {
+	public File getOutput() {
 		return output;
 	}
 	
@@ -185,6 +197,25 @@ public class Configuration {
 	
 	public Double getWaypointSize() {
 		return waypointSize;
+	}
+
+	public Double getMinLon() {
+		return minLon;
+	}
+
+
+	public Double getMaxLon() {
+		return maxLon;
+	}
+
+
+	public Double getMinLat() {
+		return minLat;
+	}
+
+
+	public Double getMaxLat() {
+		return maxLat;
 	}
 
 	
@@ -216,12 +247,17 @@ public class Configuration {
 		private Color flashbackColor = Color.white;
 		private Long flashbackDuration = 250l;
 		
-		private String output = "video.mp4"; // frame%08d.png
-		private String attribution = "Created by GPX Animator 1.2.0\n%MAP_ATTRIBUTION%";
+		private File output = new File("video.mp4"); // frame%08d.png
+		private String attribution = "Created by GPX Animator " + Constants.VERSION + "\n%MAP_ATTRIBUTION%";
 		
 		private int fontSize = 12;
 		private Double markerSize = 8.0;
 		private Double waypointSize = 6.0;
+
+		private Double minLon;
+		private Double maxLon;
+		private Double minLat;
+		private Double maxLat;
 
 		private final List<TrackConfiguration> trackConfigurationList = new ArrayList<TrackConfiguration>();
 		
@@ -234,6 +270,8 @@ public class Configuration {
 					skipIdle, flashbackColor, flashbackDuration,
 					output, attribution,
 					fontSize, markerSize, waypointSize,
+					minLon,	maxLon,	minLat,	maxLat,
+
 					Collections.unmodifiableList(trackConfigurationList)
 			);
 		}
@@ -304,7 +342,7 @@ public class Configuration {
 			return this;
 		}
 
-		public Builder output(final String output) {
+		public Builder output(final File output) {
 			this.output = output;
 			return this;
 		}
@@ -326,6 +364,26 @@ public class Configuration {
 
 		public Builder waypointSize(final Double waypointSize) {
 			this.waypointSize = waypointSize;
+			return this;
+		}
+
+		public Builder minLat(final Double minLat) {
+			this.minLat = minLat;
+			return this;
+		}
+
+		public Builder maxLat(final Double maxLat) {
+			this.maxLat = maxLat;
+			return this;
+		}
+
+		public Builder minLon(final Double minLon) {
+			this.minLon = minLon;
+			return this;
+		}
+
+		public Builder maxLon(final Double maxLon) {
+			this.maxLon = maxLon;
 			return this;
 		}
 
@@ -357,6 +415,5 @@ public class Configuration {
 				+ ", trackConfigurationList=" + trackConfigurationList
 				+ "]";
 	}
-	
 
 }

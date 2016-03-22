@@ -172,7 +172,7 @@ public class Renderer {
 			}
 		}
 
-		final String frameFilePattern = cfg.getOutput();
+		final String frameFilePattern = cfg.getOutput().toString();
 		final int dot = frameFilePattern.lastIndexOf('.');
 		final String ext = dot == -1 ? null : frameFilePattern.substring(dot + 1);
 		final boolean toImages = "png".equalsIgnoreCase(ext) || "jpg".equalsIgnoreCase(ext);
@@ -304,14 +304,41 @@ public class Renderer {
 		final TrackConfiguration trackConfiguration = cfg.getTrackConfigurationList().get(i);
 
 		final TreeMap<Long, Point2D> timePointMap = new TreeMap<Long, Point2D>();
+
+		final Double minLon = cfg.getMinLon();
+		final Double maxLon = cfg.getMaxLon();
+		final Double minLat = cfg.getMinLat();
+		final Double maxLat = cfg.getMaxLat();
+		
+		if (minLon != null) {
+			minX = lonToX(minLon);
+		}
+		if (maxLon != null) {
+			maxX = lonToX(maxLon);
+		}
+		if (maxLat != null) {
+			minY = latToY(maxLat);
+		}
+		if (minLat != null) {
+			maxY = latToY(minLat);
+		}
+		
 		for (final LatLon latLon : latLonList) {
-			final double x = Math.toRadians(latLon.getLon());
-			final double y = Math.log(Math.tan(Math.PI / 4 + Math.toRadians(latLon.getLat()) / 2));
+			final double x = lonToX(latLon.getLon());
+			final double y = latToY(latLon.getLat());
 			
-			minX = Math.min(x, minX);
-			minY = Math.min(y, minY);
-			maxX = Math.max(x, maxX);
-			maxY = Math.max(y, maxY);
+			if (minLon == null) {
+				minX = Math.min(x, minX);
+			}
+			if (maxLat == null) {
+				minY = Math.min(y, minY);
+			}
+			if (maxLon == null) {
+				maxX = Math.max(x, maxX);
+			}
+			if (minLat == null) {
+				maxY = Math.max(y, maxY);
+			}
 
 			long time;
 			final Long forcedPointInterval = trackConfiguration.getForcedPointInterval();
@@ -340,11 +367,22 @@ public class Renderer {
 		}
 		return timePointMap;
 	}
+
+
+	private static double lonToX(final Double maxLon) {
+		return Math.toRadians(maxLon);
+	}
+
+
+	private static double latToY(final double lat) {
+		return Math.log(Math.tan(Math.PI / 4 + Math.toRadians(lat) / 2));
+	}
 	
 
 	private void drawTime(final BufferedImage bi, final int frame) {
 		final String dateString = DATE_FORMAT.format(new Date(getTime(frame)));
-		printText(getGraphics(bi), dateString, bi.getWidth() - fontMetrics.stringWidth(dateString) - cfg.getMargin(), bi.getHeight() - cfg.getMargin());
+		printText(getGraphics(bi), dateString, bi.getWidth() - fontMetrics.stringWidth(dateString) - cfg.getMargin(),
+				bi.getHeight() - cfg.getMargin());
 	}
 	
 	
@@ -377,7 +415,7 @@ public class Renderer {
 				}
 				
 				final Point2D p = floorEntry.getValue();
-				if (t2 - floorEntry.getKey() < cfg.getTailDuration()) { // TODO make configurable
+				if (t2 - floorEntry.getKey() <= cfg.getTailDuration()) { // TODO make configurable
 					g2.setColor(ceilingEntry == null ? Color.white : trackConfiguration.getColor());
 					final Ellipse2D.Double marker = new Ellipse2D.Double(
 							p.getX() - markerSize / 2.0,
@@ -474,15 +512,18 @@ public class Renderer {
 		final String[] lines = text.split("\n");
 		float yy = y - (lines.length - 1) * height;
 		for (final String line : lines) {
-			final TextLayout tl = new TextLayout(line, font, frc);
-			final Shape sha = tl.getOutline(AffineTransform.getTranslateInstance(x, yy));
-			g2.setColor(Color.white);
-			g2.fill(sha);
-			g2.draw(sha);
+			if (!line.isEmpty()) {
+				final TextLayout tl = new TextLayout(line, font, frc);
+				final Shape sha = tl.getOutline(AffineTransform.getTranslateInstance(x, yy));
+				g2.setColor(Color.white);
+				g2.fill(sha);
+				g2.draw(sha);
+				
+				g2.setFont(font);
+				g2.setColor(Color.black);
+				g2.drawString(line, x, yy);
+			}
 			
-			g2.setFont(font);
-			g2.setColor(Color.black);
-			g2.drawString(line, x, yy);
 			yy += height;
 		}
 	}

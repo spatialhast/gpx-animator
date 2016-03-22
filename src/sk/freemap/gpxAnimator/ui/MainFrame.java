@@ -1,5 +1,6 @@
 package sk.freemap.gpxAnimator.ui;
 
+import java.awt.Color;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -12,8 +13,10 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.prefs.Preferences;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -38,6 +41,8 @@ import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import sk.freemap.gpxAnimator.Configuration;
+import sk.freemap.gpxAnimator.Constants;
+import sk.freemap.gpxAnimator.FileXmlAdapter;
 import sk.freemap.gpxAnimator.Renderer;
 import sk.freemap.gpxAnimator.RenderingContext;
 import sk.freemap.gpxAnimator.TrackConfiguration;
@@ -45,9 +50,13 @@ import sk.freemap.gpxAnimator.UserException;
 
 public class MainFrame extends JFrame {
 
+	static final String PREF_LAST_CWD = "lastCWD";
+	
+	private static final String PROJECT_FILENAME_SUFFIX = ".ga.xml";
+
 	private static final String UNSAVED_MSG = "There are unsaved changes. Continue?";
 
-	private static final String TITLE = "GPX Animator 1.2.0";
+	private static final String TITLE = "GPX Animator " + Constants.VERSION;
 
 	private static int FIXED_TABS = 1; // TODO set to 2 for MapPanel
 
@@ -55,7 +64,7 @@ public class MainFrame extends JFrame {
 	
 	private final JPanel contentPane;
 	private final JTabbedPane tabbedPane;
-	private final JButton startButton;
+	private final JButton renderButton;
 	
 	private SwingWorker<Void, String> swingWorker;
 	
@@ -67,7 +76,11 @@ public class MainFrame extends JFrame {
 	
 
 	private GeneralSettingsPanel generalSettingsPanel;
-	
+
+	private final Preferences prefs = Preferences.userRoot().node("app");
+
+	private final ActionListener addTrackActionListener;
+
 	
 	public Configuration createConfiguration() throws UserException {
 		final Configuration.Builder b = Configuration.createBuilder();
@@ -104,6 +117,26 @@ public class MainFrame extends JFrame {
 	 * Create the frame.
 	 */
 	public MainFrame() {
+		addTrackActionListener = new ActionListener() {
+			float hue = new Random().nextFloat();
+			
+			@Override
+			public void actionPerformed(final ActionEvent e) {
+				try {
+					addTrackSettingsTab(TrackConfiguration
+							.createBuilder()
+							.color(Color.getHSBColor(hue, 0.8f, 0.8f))
+							.build());
+					hue += 0.275f;
+					while (hue >= 1f) {
+						hue -= 1f;
+					}
+				} catch (final UserException ex) {
+					throw new RuntimeException(ex);
+				}
+			}
+		};
+
 		fileChooser.setAcceptAllFileFilterUsed(false);
 		fileChooser.addChoosableFileFilter(new FileFilter() {
 			@Override
@@ -113,7 +146,7 @@ public class MainFrame extends JFrame {
 			
 			@Override
 			public boolean accept(final File f) {
-				return f.isDirectory() || f.getName().endsWith(".ga.xml");
+				return f.isDirectory() || f.getName().endsWith(PROJECT_FILENAME_SUFFIX);
 			}
 		});
 
@@ -125,7 +158,7 @@ public class MainFrame extends JFrame {
 				)
 		);
 		setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-		setBounds(100, 100, 681, 647);
+		setBounds(100, 100, 800, 750);
 		
 		final JMenuBar menuBar = new JMenuBar();
 		setJMenuBar(menuBar);
@@ -154,14 +187,20 @@ public class MainFrame extends JFrame {
 			public void actionPerformed(final ActionEvent e) {
 				if (!changed || JOptionPane.showConfirmDialog(MainFrame.this, UNSAVED_MSG, "Warning", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
 					
+					final String lastCwd = prefs.get(PREF_LAST_CWD, null);
+					fileChooser.setCurrentDirectory(new File(lastCwd == null ? System.getProperty("user.dir") : lastCwd));
 					if (fileChooser.showOpenDialog(MainFrame.this) == JFileChooser.APPROVE_OPTION) {
 						final File file = fileChooser.getSelectedFile();
+						prefs.put(PREF_LAST_CWD, file.getParent());
+						
 						try {
 							final JAXBContext jaxbContext = JAXBContext.newInstance(Configuration.class);
 							final Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+							unmarshaller.setAdapter(new FileXmlAdapter(file.getParentFile()));
 							setConfiguration((Configuration) unmarshaller.unmarshal(file));
 							MainFrame.this.file = file;
 						} catch (final JAXBException e1) {
+							e1.printStackTrace();
 							JOptionPane.showMessageDialog(MainFrame.this, "Error opening configuration: " + e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 						}
 					}
@@ -208,16 +247,7 @@ public class MainFrame extends JFrame {
 		menuBar.add(mnTrack);
 		
 		final JMenuItem mntmAddTrack = new JMenuItem("Add");
-		mntmAddTrack.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(final ActionEvent e) {
-				try {
-					addTrackSettingsTab(TrackConfiguration.createBuilder().build());
-				} catch (final UserException e1) {
-					throw new RuntimeException(e1);
-				}
-			}
-		});
+		mntmAddTrack.addActionListener(addTrackActionListener);
 		mnTrack.add(mntmAddTrack);
 		
 		final JMenuItem mntmRemoveTrack = new JMenuItem("Remove");
@@ -305,9 +335,9 @@ public class MainFrame extends JFrame {
 		gbc_panel.gridy = 1;
 		contentPane.add(panel, gbc_panel);
 		final GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[]{174, 49, 32, 0};
+		gbl_panel.columnWidths = new int[]{174, 49, 0, 32, 0};
 		gbl_panel.rowHeights = new int[]{27, 0};
-		gbl_panel.columnWeights = new double[]{1.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panel.columnWeights = new double[]{1.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
 		gbl_panel.rowWeights = new double[]{0.0, Double.MIN_VALUE};
 		panel.setLayout(gbl_panel);
 		
@@ -328,25 +358,31 @@ public class MainFrame extends JFrame {
 		gbc_addTrackButton.gridx = 1;
 		gbc_addTrackButton.gridy = 0;
 		panel.add(addTrackButton, gbc_addTrackButton);
-		addTrackButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(final ActionEvent e) {
-				try {
-					addTrackSettingsTab(TrackConfiguration.createBuilder().build());
-				} catch (final UserException e1) {
-					throw new RuntimeException(e1);
-				}
-			}
-		});
+		addTrackButton.addActionListener(addTrackActionListener);
 		
-		startButton = new JButton("Start");
-		startButton.setEnabled(false);
+//		final JButton btnComputeBbox = new JButton("Compute BBox");
+//		final GridBagConstraints gbc_btnComputeBbox = new GridBagConstraints();
+//		gbc_btnComputeBbox.anchor = GridBagConstraints.NORTHWEST;
+//		gbc_btnComputeBbox.insets = new Insets(0, 0, 0, 5);
+//		gbc_btnComputeBbox.gridx = 2;
+//		gbc_btnComputeBbox.gridy = 0;
+//		panel.add(btnComputeBbox, gbc_btnComputeBbox);
+//		btnComputeBbox.addActionListener(new ActionListener() {
+//			@Override
+//			public void actionPerformed(final ActionEvent e) {
+//				// TODO Auto-generated method stub
+//
+//			}
+//		});
+		
+		renderButton = new JButton("Render");
+		renderButton.setEnabled(false);
 		final GridBagConstraints gbc_startButton = new GridBagConstraints();
 		gbc_startButton.anchor = GridBagConstraints.NORTHWEST;
-		gbc_startButton.gridx = 2;
+		gbc_startButton.gridx = 3;
 		gbc_startButton.gridy = 0;
-		panel.add(startButton, gbc_startButton);
-		startButton.addActionListener(new ActionListener() {
+		panel.add(renderButton, gbc_startButton);
+		renderButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(final ActionEvent e) {
 				if (swingWorker != null) {
@@ -385,7 +421,7 @@ public class MainFrame extends JFrame {
 					protected void done() {
 						swingWorker = null;
 						progressBar.setVisible(false);
-						startButton.setText("Start");
+						renderButton.setText("Start");
 
 						try {
 							get();
@@ -411,7 +447,7 @@ public class MainFrame extends JFrame {
 				});
 				
 				progressBar.setVisible(true);
-				startButton.setText("Cancel");
+				renderButton.setText("Cancel");
 				swingWorker.execute();
 			}
 		});
@@ -464,23 +500,28 @@ public class MainFrame extends JFrame {
 		tabbedPane.setSelectedComponent(trackScrollPane);
 		trackSettingsPanel.setConfiguration(tc);
 		
-		startButton.setEnabled(true);
+		renderButton.setEnabled(true);
 		
 		changed(true);
 	}
 	
 	private void afterRemove() {
 		if (tabbedPane.getTabCount() == 1) {
-			startButton.setEnabled(false);
+			renderButton.setEnabled(false);
 		}
 		changed(true);
 	}
 	
 	private void saveAs() {
+		final String lastCwd = prefs.get(PREF_LAST_CWD, null);
+		fileChooser.setCurrentDirectory(new File(lastCwd == null ? System.getProperty("user.dir") : lastCwd));
+		fileChooser.setSelectedFile(new File("")); // to forget previous file name
 		if (fileChooser.showSaveDialog(MainFrame.this) == JFileChooser.APPROVE_OPTION) {
 			File file = fileChooser.getSelectedFile();
-			if (!file.getName().endsWith(".ga.xml")) {
-				file = new File(file.getPath() + ".ga.xml");
+			prefs.put(PREF_LAST_CWD, file.getParent());
+
+			if (!file.getName().endsWith(PROJECT_FILENAME_SUFFIX)) {
+				file = new File(file.getPath() + PROJECT_FILENAME_SUFFIX);
 			}
 			save(file);
 		}
@@ -488,14 +529,18 @@ public class MainFrame extends JFrame {
 
 	private void save(final File file) {
 		try {
-			final JAXBContext jaxbContext = JAXBContext.newInstance(Configuration.class);
-			final Marshaller marshaller = jaxbContext.createMarshaller();
-			marshaller.marshal(createConfiguration(), file);
-			MainFrame.this.file = file;
-			changed(false);
-		} catch (final JAXBException e) {
-			JOptionPane.showMessageDialog(this, "Error saving configuration: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+			try {
+				final JAXBContext jaxbContext = JAXBContext.newInstance(Configuration.class);
+				final Marshaller marshaller = jaxbContext.createMarshaller();
+				marshaller.setAdapter(new FileXmlAdapter(file.getParentFile()));
+				marshaller.marshal(createConfiguration(), file);
+				MainFrame.this.file = file;
+				changed(false);
+			} catch (final JAXBException e) {
+				throw new UserException(e.getMessage(), e);
+			}
 		} catch (final UserException e) {
+			e.printStackTrace();
 			JOptionPane.showMessageDialog(this, "Error saving configuration: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 		}
 	}

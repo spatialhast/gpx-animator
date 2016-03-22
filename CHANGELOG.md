@@ -1,3 +1,29 @@
+version 1.3.0 (2015-11-22)
+--------------------------
+* configurable bounding box
+
+version 1.2.4 (2015-11-02)
+--------------------------
+* fixed #18 (error saving configuration)
+
+version 1.2.3 (2015-08-23)
+--------------------------
+* fixed NPE on empty attribution
+* fixed not showing marker when tail was empty or zero
+* updated maps
+* removed unused --debug option
+
+version 1.2.2 (2015-01-18)
+--------------------------
+* fixed NPE when adding new track
+* preselect different color to newly added tracks
+
+version 1.2.1 (2015-01-11)
+--------------------------
+* handle all ISO 8601 date formats in GPX
+* remember directory in file dialogs
+* store relative paths in project XML file
+
 version 1.2.0 (2014-02-03)
 --------------------------
 * preparation for interactive map view configuration

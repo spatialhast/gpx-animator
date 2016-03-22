@@ -14,21 +14,27 @@
  */
 package sk.freemap.gpxAnimator;
 
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.WritableRaster;
+import java.io.File;
+import java.nio.file.Path;
 
-final class Utils {
+import javax.xml.bind.annotation.adapters.XmlAdapter;
+
+public class FileXmlAdapter extends XmlAdapter<String, File> {
+
+	private final Path base;
 	
-	private Utils() {
-		throw new AssertionError();
+	public FileXmlAdapter(final File base) {
+		this.base = base.toPath();
+	}
+	
+	@Override
+	public File unmarshal(final String string) throws Exception {
+		return base.resolve(string).toFile();
 	}
 
-	static BufferedImage deepCopy(final BufferedImage bi) {
-		final ColorModel cm = bi.getColorModel();
-		final boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
-		final WritableRaster raster = bi.copyData(null);
-		return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+	@Override
+	public String marshal(final File file) throws Exception {
+		return base.relativize(file.getAbsoluteFile().toPath()).toString();
 	}
 
 }
